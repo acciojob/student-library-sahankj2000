@@ -1,5 +1,6 @@
 package com.example.library.studentlibrary.services;
 
+import com.example.library.studentlibrary.controller.TransactionController;
 import com.example.library.studentlibrary.models.*;
 import com.example.library.studentlibrary.repositories.BookRepository;
 import com.example.library.studentlibrary.repositories.CardRepository;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +48,32 @@ public class TransactionService {
 
         //Note that the error message should match exactly in all cases
 
-       return null; //return transactionId instead
+        int criteria = 0;
+
+        Book book = bookRepository5.findById(bookId).orElse(null);
+        if(book == null) throw new Exception("Book is either unavailable or not present");
+        else criteria++;
+
+        Card card = cardRepository5.findById(cardId).orElse(null);
+        if(card == null) throw new Exception("Card is invalid");
+        else criteria++;
+
+        ///////
+        int count = card.getBooks().size();
+        if(count > max_allowed_books) throw new Exception("Book limit has reached for this card");
+        else criteria++;
+
+        Transaction transaction = null;
+
+        if(criteria == 3){
+            transaction = Transaction.builder().book(book).card(card).isIssueOperation(true).transactionStatus(TransactionStatus.SUCCESSFUL).build();
+            transactionRepository5.save(transaction);
+            book.setAvailable(false);
+            bookRepository5.updateBook(book);
+        }
+
+        if(transaction != null) return transaction.getTransactionId();
+        return null; //return transactionId instead
     }
 
     public Transaction returnBook(int cardId, int bookId) throws Exception{
@@ -58,7 +85,12 @@ public class TransactionService {
         //make the book available for other users
         //make a new transaction for return book which contains the fine amount as well
 
-        Transaction returnBookTransaction  = null;
+        Book book = transaction.getBook();
+        book.setAvailable(true);
+        bookRepository5.updateBook(book);
+
+        Transaction returnBookTransaction  = Transaction.builder().book(book).card(transaction.getCard()).transactionStatus(TransactionStatus.SUCCESSFUL).fineAmount(0).build();
+        transactionRepository5.save(returnBookTransaction);
         return returnBookTransaction; //return the transaction after updating all details
     }
 }
